@@ -1,0 +1,168 @@
+{
+  "leadModelFamily": "google",
+  "paseoEndpoint": "http://127.0.0.1:16767/mcp/agents",
+  "allowedModels": [
+    {
+      "provider": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "family": "moonshot",
+      "tier": "flagship",
+      "thinkingOptions": ["low", "high", "max"],
+      "defaultThinking": "high",
+      "readonlyModeId": "plan"
+    },
+    {
+      "provider": "qwen-code",
+      "model": "qwen3.8-max(openai)",
+      "family": "qwen",
+      "tier": "flagship",
+      "thinkingOptions": null,
+      "defaultThinking": null,
+      "readonlyModeId": "plan"
+    },
+    {
+      "provider": "glm-acp-agent",
+      "model": "glm-5.3",
+      "family": "zhipu",
+      "tier": "flagship",
+      "thinkingOptions": ["minimal", "low", "medium", "high", "xhigh", "max"],
+      "defaultThinking": "xhigh",
+      "readonlyModeId": "default"
+    },
+    {
+      "provider": "glm-acp-agent",
+      "model": "glm-5.3-flash",
+      "family": "zhipu",
+      "tier": "fast",
+      "thinkingOptions": ["minimal", "low", "medium", "high", "xhigh", "max"],
+      "defaultThinking": "medium",
+      "readonlyModeId": "default"
+    },
+    {
+      "provider": "opencode",
+      "model": "deepseek/deepseek-flash",
+      "family": "deepseek",
+      "tier": "fast",
+      "thinkingOptions": ["none", "low", "high", "max"],
+      "defaultThinking": "high",
+      "readonlyModeId": "plan"
+    }
+  ],
+  "ministers": {
+    "feng": {
+      "role": "红队攻击手（固定席）",
+      "provider": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "thinkingOptionId": "high",
+      "fallback": {
+        "provider": "qwen-code",
+        "model": "qwen3.8-max(openai)",
+        "thinkingOptionId": null
+      }
+    },
+    "yuan": {
+      "role": "长期席（架构官 / 立意官）",
+      "provider": "qwen-code",
+      "model": "qwen3.8-max(openai)",
+      "thinkingOptionId": null,
+      "fallback": {
+        "provider": "glm-acp-agent",
+        "model": "glm-5.3",
+        "thinkingOptionId": "xhigh"
+      }
+    },
+    "li": {
+      "role": "辩护人（正方钢铁人）",
+      "provider": "glm-acp-agent",
+      "model": "glm-5.3",
+      "thinkingOptionId": "xhigh",
+      "fallback": {
+        "provider": "qwen-code",
+        "model": "qwen3.8-max(openai)",
+        "thinkingOptionId": null
+      }
+    },
+    "shen": {
+      "role": "方法检察官（方法审查官）",
+      "provider": "opencode",
+      "model": "deepseek/deepseek-flash",
+      "thinkingOptionId": "max",
+      "fallback": {
+        "provider": "glm-acp-agent",
+        "model": "glm-5.3-flash",
+        "thinkingOptionId": "high"
+      }
+    },
+    "ju": {
+      "role": "证据官（信源/事实核查官）",
+      "provider": "opencode",
+      "model": "deepseek/deepseek-flash",
+      "thinkingOptionId": "high",
+      "fallback": {
+        "provider": "glm-acp-agent",
+        "model": "glm-5.3-flash",
+        "thinkingOptionId": "medium"
+      }
+    },
+    "mou": {
+      "role": "落地官（工程官）",
+      "provider": "glm-acp-agent",
+      "model": "glm-5.3-flash",
+      "thinkingOptionId": "medium",
+      "fallback": {
+        "provider": "opencode",
+        "model": "deepseek/deepseek-flash",
+        "thinkingOptionId": "low"
+      }
+    },
+    "zhong": {
+      "role": "读者代理（成本官 / 读者体感）",
+      "provider": "opencode",
+      "model": "deepseek/deepseek-flash",
+      "thinkingOptionId": "low",
+      "fallback": {
+        "provider": "glm-acp-agent",
+        "model": "glm-5.3-flash",
+        "thinkingOptionId": "low"
+      }
+    },
+    "gu": {
+      "role": "结构师（结构官）",
+      "provider": "glm-acp-agent",
+      "model": "glm-5.3-flash",
+      "thinkingOptionId": "high",
+      "fallback": {
+        "provider": "opencode",
+        "model": "deepseek/deepseek-flash",
+        "thinkingOptionId": "high"
+      }
+    }
+  },
+  "pool": [
+    {
+      "provider": "glm-acp-agent",
+      "model": "glm-5.3",
+      "thinkingOptionId": "xhigh"
+    },
+    {
+      "provider": "kimi",
+      "model": "kimi-code/k3.1-pro",
+      "thinkingOptionId": "high"
+    },
+    {
+      "provider": "qwen-code",
+      "model": "qwen3.8-max(openai)",
+      "thinkingOptionId": null
+    },
+    {
+      "provider": "opencode",
+      "model": "deepseek/deepseek-flash",
+      "thinkingOptionId": "high"
+    },
+    {
+      "provider": "glm-acp-agent",
+      "model": "glm-5.3-flash",
+      "thinkingOptionId": "medium"
+    }
+  ]
+}

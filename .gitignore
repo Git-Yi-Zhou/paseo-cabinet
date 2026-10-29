@@ -1,0 +1,12 @@
+# Machine-specific generated files (created by `npm run setup`)
+mcp_config.json
+config/source-lock.json
+
+# Runtime cabinet archives & logs
+.cabinet/
+*.log
+
+# Node & OS artifacts
+node_modules/
+.DS_Store
+Thumbs.db

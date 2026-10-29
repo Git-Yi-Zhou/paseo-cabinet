@@ -1,0 +1,17 @@
+{
+  "name": "paseo-cabinet",
+  "version": "0.1.0",
+  "private": false,
+  "license": "MIT",
+  "author": "Git-Yi-Zhou",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Git-Yi-Zhou/paseo-cabinet.git"
+  },
+  "type": "module",
+  "description": "Paseo-backed Cabinet deliberation plugin for Google Antigravity (based on dsh-cabinet v0.2.6)",
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "paseo-cabinet": {
+      "command": "__NODE_EXE__",
+      "args": [
+        "__PLUGIN_ROOT__/bridge/mcp-server.mjs"
+      ],
+      "env": {
+        "PASEO_MCP_ENDPOINT": "http://127.0.0.1:16767/mcp/agents",
+        "CABINET_HOME": "__CABINET_HOME__",
+        "CABINET_MINISTERS_CONFIG": "__PLUGIN_ROOT__/config/ministers.json"
+      }
+    }
+  }
+}
