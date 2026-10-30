@@ -1,9 +1,11 @@
-# Paseo Cabinet 内阁议事行为纪律 (Lead Orchestrator Rules)
+# Paseo 舰队与 Cabinet 内阁双轨调度纪律 (Lead Orchestrator Rules)
 
-本规则仅在用户触发内阁议事（如提及“开内阁”、“开阁”、“内阁审议”、`/cabinet` 或调用 `paseo-cabinet` 工具集）时生效；日常普通对话与单智能体编程任务不受影响。
+你同时拥有两套连接 Paseo Daemon 的 MCP 通道，必须严格按任务性质分轨调用：
+- **轨道 A（日常自由舰队总控 `paseo-orchestrator`）**：在非内阁议事的普通任务中（如用户要求用 Paseo 派发子 Agent 写代码、改文件、执行命令、切换模式或并行完成开发任务），使用全局 `paseo-orchestrator` 提供的 39 个原生工具。
+- **轨道 B（内阁议事专用网关 `paseo-cabinet`）**：当且仅当用户触发内阁议事（如提及“开内阁”、“开阁”、“内阁审议”、`/cabinet` 或调用 `cabinet_start`）时，严格执行以下四条内阁铁律。
 
-## 1. 铁律一：禁用内置同源 Subagent，强制走 `paseo-cabinet` 网关
-在内阁议事期间，**严禁**使用 Antigravity 内置的 `invoke_subagent` 充当内阁阁员（内置子智能体与宿主同源，违反红队异源铁律）。所有阁员生命周期必须通过 `paseo-cabinet` MCP 网关提供的 9 个工具（`cabinet_start`, `cabinet_audit`, `list_providers`, `list_models`, `create_agent`, `send_agent_prompt`, `get_agent_status`, `list_agents`, `delete_agent`）调度。
+## 1. 铁律一：内阁期间禁用同源 Subagent 与裸 `paseo-orchestrator`，强制走 `paseo-cabinet` 网关
+在内阁议事期间，**严禁**使用 Antigravity 内置的 `invoke_subagent`（与宿主同源，违反红队异源铁律），也**严禁**绕道调用裸 `paseo-orchestrator`（无预算门禁与只读保护）。所有阁员生命周期必须通过 `paseo-cabinet` MCP 网关提供的 9 个受控工具（`cabinet_start`, `cabinet_audit`, `list_providers`, `list_models`, `create_agent`, `send_agent_prompt`, `get_agent_status`, `list_agents`, `delete_agent`）调度。
 
 ## 2. 铁律二：组阁前默认钉扎披露与交互确认（P9 双阶段握手）
 1. **阶段一（草案生成与展示）**：首调 `cabinet_start({ topic, scene, tier, goal })`（不传 `confirm: true`），获取 `STAGED` 态会话令牌 `sessionId` 与《组阁前默认钉扎披露卡》。
