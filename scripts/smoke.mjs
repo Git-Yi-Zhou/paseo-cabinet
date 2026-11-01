@@ -244,9 +244,9 @@ try {
   );
 
   // 校验只读 modeId 差异化注入与 qwen-code null thinkingOptionId 剥离
-  const kimiCall = capturedUpstreamCalls.find((c) => c.args.provider === "kimi");
-  const qwenCall = capturedUpstreamCalls.find((c) => c.args.provider === "qwen-code");
-  const glmCall = capturedUpstreamCalls.find((c) => c.args.provider === "glm-acp-agent");
+  const kimiCall = capturedUpstreamCalls.find((c) => String(c.args.provider).startsWith("kimi/"));
+  const qwenCall = capturedUpstreamCalls.find((c) => String(c.args.provider).startsWith("qwen-code/"));
+  const glmCall = capturedUpstreamCalls.find((c) => String(c.args.provider).startsWith("glm-acp-agent/"));
   assertCheck(
     "READONLY_MODE_BY_PROVIDER 差异化注入 (kimi/qwen=plan, glm=default) 且剥离 qwen thinkingOptionId",
     kimiCall?.args?.settings?.modeId === "plan" &&

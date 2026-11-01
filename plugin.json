@@ -1,7 +1,7 @@
 {
   "name": "paseo-cabinet",
   "displayName": "Paseo Cabinet 内阁议事",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "基于 dsh-cabinet (v0.2.6) 与 Paseo ACP 舰队的多智能体异构内阁议事插件。由 Antigravity 担任内阁首辅（Lead），通过 Paseo 调度 Kimi / Qwen / GLM / DeepSeek 异构 CLI 阁员完成组阁确认、独立立论、交叉质询、合议定案与归档审计。",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [

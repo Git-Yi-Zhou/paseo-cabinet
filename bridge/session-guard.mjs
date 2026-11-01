@@ -1,4 +1,4 @@
-import { mkdirSync, appendFileSync, existsSync } from "node:fs";
+import { mkdirSync, appendFileSync, existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
 import { TIERS } from "./domain.mjs";
@@ -57,8 +57,102 @@ export class SessionGuard {
     return `${base}-${randomBytes(2).toString("hex")}`;
   }
 
-  getSession(sessionId) {
-    return this.sessions.get(sessionId) || null;
+  getSession(sessionId, workspaceRoot = process.cwd()) {
+    if (this.sessions.has(sessionId)) {
+      return this.sessions.get(sessionId);
+    }
+    return this.recoverSessionFromDisk(sessionId, workspaceRoot);
+  }
+
+  recoverSessionFromDisk(sessionId, workspaceRoot = process.cwd()) {
+    if (!sessionId) return null;
+    const resolvedRoot = resolve(workspaceRoot || process.cwd());
+    const eventsPath = join(resolvedRoot, ".cabinet", sessionId, "events.jsonl");
+    if (!existsSync(eventsPath)) return null;
+
+    try {
+      const lines = readFileSync(eventsPath, "utf8")
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => JSON.parse(l));
+
+      const meta = lines.find((l) => l.session_meta) || {};
+      const tier = meta.tier || "standard";
+      const tierSpec = TIERS[tier] || TIERS.standard;
+      let seq = 0;
+      let used = 0;
+      let gateBlocks = 0;
+      let gateOverrides = 0;
+      let hadUserModification = false;
+      const agentIds = [];
+      let seats = [];
+
+      for (const row of lines) {
+        if (typeof row.seq === "number" && row.seq > seq) {
+          seq = row.seq;
+        }
+        if (
+          typeof row.event === "string" &&
+          (row.event.startsWith("dispatch:spawn") || row.event.startsWith("dispatch:send_message"))
+        ) {
+          used += 1;
+          if (row.delegationId && !agentIds.includes(row.delegationId)) {
+            agentIds.push(row.delegationId);
+          }
+        }
+        if (row.event === "cost:cap_hit") {
+          gateBlocks += 1;
+        }
+        if (row.event === "steering:cabinet_confirmed" && String(row.detail || "").includes("改定")) {
+          hadUserModification = true;
+        }
+        if (row.event === "setup:disclosure_card_staged" && typeof row.detail === "string") {
+          const m = row.detail.match(/^seats=(.+)$/);
+          if (m) {
+            seats = m[1].split(",").map((item) => {
+              const [seat, pm] = item.split(":");
+              const slashIdx = (pm || "").indexOf("/");
+              return {
+                seat,
+                provider: slashIdx >= 0 ? pm.slice(0, slashIdx) : pm,
+                rawModel: slashIdx >= 0 ? pm.slice(slashIdx + 1) : "",
+              };
+            });
+          }
+        }
+      }
+
+      const recovered = {
+        sessionId,
+        state: "ACTIVE",
+        topic: meta.topic || "",
+        scene: meta.scene || "coding",
+        tier,
+        tierHistory: [tier],
+        goal: "",
+        roles: null,
+        workspaceRoot: resolvedRoot,
+        overrides: [],
+        hadUserModification,
+        validation: { errors: [], warnings: [], seats },
+        seats,
+        maxSubagentCalls: meta.cap || tierSpec.callCap,
+        used,
+        inflight: 0,
+        gateBlocks,
+        gateOverrides,
+        overrideCode: null,
+        agentIds,
+        seq,
+        eventsInitialized: true,
+        createdAt: meta.t || new Date().toISOString(),
+      };
+      this.sessions.set(sessionId, recovered);
+      return recovered;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -125,7 +219,7 @@ export class SessionGuard {
    * 阶段二：用户确认披露卡后，将会话从 STAGED 跃迁为 ACTIVE（或处理中途升档）
    */
   activateSession({ sessionId, tier, overrideCode, workspaceRoot }) {
-    const session = this.sessions.get(sessionId);
+    const session = this.getSession(sessionId, workspaceRoot);
     if (!session) {
       throw new Error(
         `CABINET_SESSION_REQUIRED: 未找到会话 "${sessionId}"。请先调用 cabinet_start（不带 confirm:true）生成 STAGED 组阁披露卡。`
@@ -257,7 +351,7 @@ export class SessionGuard {
       );
     }
 
-    const session = this.sessions.get(cabinetSessionId);
+    const session = this.getSession(cabinetSessionId, rawArgs?.cwd);
     if (!session) {
       throw new Error(
         `CABINET_SESSION_REQUIRED: 未知的 cabinetSessionId "${cabinetSessionId}"，请先调用 cabinet_start。`
@@ -294,12 +388,35 @@ export class SessionGuard {
 
     const upstreamArgs = structuredClone(rawArgs);
     delete upstreamArgs.cabinetSessionId;
+    const waitForTurnComplete = Boolean(upstreamArgs.waitForTurnComplete);
+    delete upstreamArgs.waitForTurnComplete;
+
+    let baseProvider = "";
+    let resolvedModel = "";
 
     if (toolName === "create_agent") {
-      if (!upstreamArgs.cwd) {
-        upstreamArgs.cwd = session.workspaceRoot;
+      const rawProviderStr = String(upstreamArgs.provider || "").trim();
+      const rawModelStr = String(upstreamArgs.model || "").trim();
+      if (rawProviderStr.includes("/")) {
+        const slashIdx = rawProviderStr.indexOf("/");
+        baseProvider = rawProviderStr.slice(0, slashIdx);
+        resolvedModel = rawModelStr || rawProviderStr.slice(slashIdx + 1);
+        upstreamArgs.provider = rawProviderStr;
+      } else {
+        baseProvider = rawProviderStr;
+        resolvedModel = rawModelStr;
+        if (rawModelStr) {
+          upstreamArgs.provider = `${rawProviderStr}/${rawModelStr}`;
+        }
       }
-      const readonlyMode = READONLY_MODE_BY_PROVIDER[upstreamArgs.provider] || "plan";
+      delete upstreamArgs.model;
+      delete upstreamArgs.cwd;
+
+      if (!upstreamArgs.title) {
+        upstreamArgs.title = `Cabinet-${baseProvider || "agent"}`;
+      }
+
+      const readonlyMode = READONLY_MODE_BY_PROVIDER[baseProvider] || "plan";
       upstreamArgs.settings = {
         ...(upstreamArgs.settings || {}),
         modeId: readonlyMode,
@@ -309,7 +426,7 @@ export class SessionGuard {
         upstreamArgs.settings.thinkingOptionId === null ||
         upstreamArgs.settings.thinkingOptionId === undefined ||
         upstreamArgs.settings.thinkingOptionId === "" ||
-        upstreamArgs.provider === "qwen-code"
+        baseProvider === "qwen-code"
       ) {
         delete upstreamArgs.settings.thinkingOptionId;
       }
@@ -335,7 +452,7 @@ export class SessionGuard {
         toolName === "create_agent" ? "dispatch:spawn" : "dispatch:send_message";
       const detail =
         toolName === "create_agent"
-          ? `${upstreamArgs.provider}/${upstreamArgs.model} (call ${session.used}/${session.maxSubagentCalls})`
+          ? `${baseProvider}/${resolvedModel} (call ${session.used}/${session.maxSubagentCalls})`
           : `prompt to ${agentId} (call ${session.used}/${session.maxSubagentCalls})`;
 
       this.appendEvent(session, {
@@ -345,6 +462,32 @@ export class SessionGuard {
         delegationId: String(agentId),
         detail,
       });
+
+      if (waitForTurnComplete && agentId && !String(agentId).startsWith("mock-agent-")) {
+        const deadline = Date.now() + 180_000;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 2000));
+          try {
+            const stRes = await paseoClient.callTool("get_agent_status", { agentId });
+            const stText = stRes?.content?.find((c) => typeof c?.text === "string")?.text || "";
+            const stJson = stText.includes("{") ? JSON.parse(stText.slice(stText.indexOf("{"))) : {};
+            if (stJson.status && stJson.status !== "running") {
+              break;
+            }
+          } catch {
+            break;
+          }
+        }
+        try {
+          const actRes = await paseoClient.callTool("get_agent_activity", { agentId, limit: 50 });
+          const actText = actRes?.content?.find((c) => typeof c?.text === "string")?.text || "";
+          if (actText && Array.isArray(result?.content)) {
+            result.content.push({ type: "text", text: `\n--- Agent Activity ---\n${actText}` });
+          }
+        } catch {
+          // ignore activity fetch failure
+        }
+      }
 
       return result;
     } catch (err) {

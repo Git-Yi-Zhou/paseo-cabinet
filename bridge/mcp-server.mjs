@@ -257,7 +257,9 @@ const TOOLS = [
 ];
 
 async function handleCabinetStart(args = {}) {
-  const existing = args.sessionId ? sessionGuard.getSession(args.sessionId) : null;
+  const existing = args.sessionId
+    ? sessionGuard.getSession(args.sessionId, args.workspaceRoot)
+    : null;
   const topic = String(args.topic || existing?.topic || "").trim();
   if (!topic) {
     throw new Error("cabinet_start: 参数 topic 必填（首次调用须提供审议议题）。");
@@ -419,7 +421,7 @@ async function handleCabinetAudit(args = {}) {
     throw new Error("cabinet_audit: 必须提供 cabinetSessionId。");
   }
 
-  const session = sessionGuard.getSession(sid);
+  const session = sessionGuard.getSession(sid, args.workspaceRoot);
   const root = resolve(args.workspaceRoot || session?.workspaceRoot || process.cwd());
   const sessionDir = join(root, ".cabinet", sid);
 
@@ -520,7 +522,9 @@ async function handleCabinetAudit(args = {}) {
   if (session && Array.isArray(session.agentIds)) {
     for (const agentId of session.agentIds) {
       try {
-        await paseoClient.callTool("delete_agent", { agentId });
+        await paseoClient
+          .callTool("kill_agent", { agentId })
+          .catch(() => paseoClient.callTool("delete_agent", { agentId }));
         cleanedAgents.push(agentId);
       } catch {
         // 已停止或已删除的阁员忽略错误
@@ -565,11 +569,51 @@ async function dispatchToolCall(name, args = {}) {
     case "create_agent":
     case "send_agent_prompt":
       return await sessionGuard.interceptSubagentCall(name, args, paseoClient);
+    case "get_agent_status": {
+      const agentId = String(args?.agentId || "").trim();
+      const wait = Boolean(args?.waitForTurnComplete);
+      const timeoutMs = Number(args?.turnTimeoutMs) > 0 ? Number(args.turnTimeoutMs) : 180_000;
+      let statusResult = await paseoClient.callTool("get_agent_status", { agentId });
+
+      if (wait) {
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+          const stText =
+            statusResult?.content?.find((c) => typeof c?.text === "string")?.text || "";
+          const stJson = stText.includes("{") ? JSON.parse(stText.slice(stText.indexOf("{"))) : {};
+          if (!stJson.status || stJson.status !== "running") {
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 2000));
+          statusResult = await paseoClient.callTool("get_agent_status", { agentId });
+        }
+      }
+
+      try {
+        const actResult = await paseoClient.callTool("get_agent_activity", {
+          agentId,
+          limit: 50,
+        });
+        const actText =
+          actResult?.content?.find((c) => typeof c?.text === "string")?.text || "";
+        if (actText && Array.isArray(statusResult?.content)) {
+          statusResult.content.push({
+            type: "text",
+            text: `\n--- Agent Activity (Stance / Report) ---\n${actText}`,
+          });
+        }
+      } catch {
+        // ignore if get_agent_activity is unavailable on mock client
+      }
+      return statusResult;
+    }
+    case "delete_agent":
+      return await paseoClient
+        .callTool("kill_agent", { agentId: args?.agentId })
+        .catch(() => paseoClient.callTool("delete_agent", args));
     case "list_providers":
     case "list_models":
-    case "get_agent_status":
     case "list_agents":
-    case "delete_agent":
       return await paseoClient.callTool(name, args);
     default:
       throw new Error(

@@ -280,6 +280,16 @@ export class PaseoHttpClient {
           );
         }
 
+        if (rpcMsg?.result?.isError) {
+          const errText = Array.isArray(rpcMsg.result.content)
+            ? rpcMsg.result.content
+                .map((c) => (c && typeof c.text === "string" ? c.text : ""))
+                .filter(Boolean)
+                .join(" ")
+            : JSON.stringify(rpcMsg.result);
+          throw new Error(`[paseo-client] Tool Error (${toolName}): ${errText}`);
+        }
+
         return rpcMsg?.result ?? { content: [{ type: "text", text: JSON.stringify(rpcMsg) }] };
       } catch (err) {
         if (attempt < maxRetries) {
